@@ -2,6 +2,7 @@ package org.lpz.usercenter.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.lpz.usercenter.common.BaseResponse;
@@ -10,6 +11,7 @@ import org.lpz.usercenter.common.ResultUtils;
 import org.lpz.usercenter.exception.BusinessException;
 import org.lpz.usercenter.model.VO.UserVO;
 import org.lpz.usercenter.model.domain.User;
+import org.lpz.usercenter.model.request.UpdateTagsRequest;
 import org.lpz.usercenter.model.request.UserLoginRequest;
 import org.lpz.usercenter.model.request.UserRegisterRequest;
 import org.lpz.usercenter.service.UserService;
@@ -167,6 +169,21 @@ public class UserController {
 
         List<User> userList = userService.searchUsersByTags(tagNameList);
         return ResultUtils.success(userList);
+    }
+
+    @PostMapping("/change/tags")
+    public BaseResponse<Boolean> changeUsersTags(@RequestBody UpdateTagsRequest updateTagsRequest, HttpServletRequest request){
+        List<String> tagsNameList = updateTagsRequest.getTagsNameList();
+        if (CollectionUtils.isEmpty(tagsNameList)){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+
+        User loginUser = userService.getLoginUser(request);
+        Gson gson = new Gson();
+        String tags = gson.toJson(tagsNameList);
+        loginUser.setTags(tags);
+        boolean result = userService.updateById(loginUser);
+        return ResultUtils.success(result);
     }
 
     @PostMapping("/update")
