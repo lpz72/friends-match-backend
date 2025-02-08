@@ -1,4 +1,4 @@
-package org.lpz.usercenter.model.domain.request;
+package org.lpz.usercenter.model.request;
 
 import lombok.Data;
 
@@ -6,11 +6,11 @@ import java.io.Serializable;
 import java.util.UUID;
 
 /**
- * 用户注册请求体
+ * 用户登录请求体
  * @author lpz
  */
 @Data
-public class UserRegisterRequest implements Serializable {
+public class UserLoginRequest implements Serializable {
 
     //生成一个序列化id
     private static final long serialVersionUID = UUID.randomUUID().getMostSignificantBits();
@@ -19,7 +19,4 @@ public class UserRegisterRequest implements Serializable {
 
     private String userPassword;
 
-    private String checkPassword;
-
-    private String planetCode;
 }

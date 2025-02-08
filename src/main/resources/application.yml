@@ -11,14 +11,25 @@ spring:
   # session失效时间，一天86400秒
   session:
     timeout: 86400
+    store-type: redis
+  # redis配置
+  redis:
+    port: 6379
+    host: localhost
+    database: 1
 
 server:
   port: 8080
   servlet:
     context-path: /api
+#    session:
+#      cookie:
+#        domain: localhost
 
 mybatis-plus:
   configuration:
+    # mybatis 输出日志
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     # MyBatis 配置,取消下划线转驼峰
     map-underscore-to-camel-case: false
   # 配置逻辑删除

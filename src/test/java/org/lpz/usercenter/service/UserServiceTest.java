@@ -1,11 +1,16 @@
 package org.lpz.usercenter.service;
+import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.lpz.usercenter.mapper.UserMapper;
 import org.lpz.usercenter.model.domain.User;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.util.Assert;
 
 import javax.annotation.Resource;
 
@@ -73,5 +78,12 @@ class UserServiceTest {
         result = userService.userRegister(userAccount,userPassword,checkPassword,planetCode);
         Assertions.assertTrue(result > 0); //成功插入
 
+    }
+
+    @Test
+    void searchUsersByTags() {
+        List<String> tagNameList = Arrays.asList("java","python");
+        List<User> userList = userService.searchUsersByTags(tagNameList);
+        Assertions.assertNotNull(userList);
     }
 }

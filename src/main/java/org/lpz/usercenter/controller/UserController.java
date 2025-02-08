@@ -1,32 +1,42 @@
 package org.lpz.usercenter.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.lpz.usercenter.common.BaseResponse;
 import org.lpz.usercenter.common.ErrorCode;
 import org.lpz.usercenter.common.ResultUtils;
 import org.lpz.usercenter.exception.BusinessException;
+import org.lpz.usercenter.model.VO.UserVO;
 import org.lpz.usercenter.model.domain.User;
-import org.lpz.usercenter.model.domain.request.UserLoginRequest;
-import org.lpz.usercenter.model.domain.request.UserRegisterRequest;
+import org.lpz.usercenter.model.request.UserLoginRequest;
+import org.lpz.usercenter.model.request.UserRegisterRequest;
 import org.lpz.usercenter.service.UserService;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static org.lpz.usercenter.constant.UserConstant.ADMIN_ROLE;
 import static org.lpz.usercenter.constant.UserConstant.USER_LOGIN_STATE;
 
 @RestController
 @RequestMapping("/user")
+//@CrossOrigin(origins = {"http://localhost:3000"},allowCredentials = "true")
+//@CrossOrigin(origins = {"http://39.107.143.21:80"},allowCredentials = "true")
+@Slf4j
 public class UserController {
 
     @Resource
     private UserService userService;
+    @Resource
+    private RedisTemplate redisTemplate;
 
     /**
      * 用户注册
@@ -121,7 +131,7 @@ public class UserController {
     public BaseResponse<List<User>> searchUsers(String username,HttpServletRequest request){
         //HttpServletRequest request是获取用户登录态
         // 鉴权，仅管理员可查询
-        if (!isAdmin(request)){
+        if (!userService.isAdmin(request)){
             throw new BusinessException(ErrorCode.NO_AUTH);
         }
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
@@ -137,7 +147,7 @@ public class UserController {
 
     @PostMapping("/delete")
     public BaseResponse<Boolean> deleteUser(@RequestBody long id, HttpServletRequest request){
-        if (!isAdmin(request)){
+        if (!userService.isAdmin(request)){
             throw new BusinessException(ErrorCode.NO_AUTH);
         }
         if (id <= 0){
@@ -149,20 +159,71 @@ public class UserController {
 
     }
 
-    /**
-     * 是否为管理员
-     * @param request 获取登录态
-     * @return
-     */
-    private boolean isAdmin(HttpServletRequest request){
-        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
-        User user = (User) userObj;
-        if (user == null || user.getUserRole() != ADMIN_ROLE){
-            return false;
+    @GetMapping("/search/tags")
+    public BaseResponse<List<User>> searchUsersByTags(@RequestParam(required = false) List<String> tagNameList){
+        if (CollectionUtils.isEmpty(tagNameList)){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
 
-        return true;
+        List<User> userList = userService.searchUsersByTags(tagNameList);
+        return ResultUtils.success(userList);
     }
 
+    @PostMapping("/update")
+    //因为前端的请求是json数据类型，所以需要使用@RequestBody注解，前提是post方式才会生效
+    public BaseResponse<Integer> updateUser(@RequestBody User user,HttpServletRequest request){
+        //检验数据是否为空
+        if (user == null){
+            throw new BusinessException(ErrorCode.NO_AUTH);
+        }
+
+        User loginUSer = userService.getLoginUser(request);
+        int result = userService.updateUser(user, loginUSer);
+        return ResultUtils.success(result);
+    }
+
+    //todo 推荐多个，未实现
+    @GetMapping("/recommend")
+    public BaseResponse<Page<User>> recommendUsers(long pageSize, long pageNum, HttpServletRequest request){
+        User loginUser = userService.getLoginUser(request);
+        String key = String.format("yupao:user:recommend:%s",loginUser.getId());
+        ValueOperations<String,Object> valueOperations = redisTemplate.opsForValue();
+
+        //如果有缓存，直接读缓存
+        Page<User> userPage = (Page<User>) valueOperations.get(key);
+        if (userPage != null) {
+            return ResultUtils.success(userPage);
+        }
+
+        //无缓存，查数据库，设置缓存
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        //使用分页
+         userPage = userService.page(new Page<>(pageNum,pageSize),queryWrapper);
+        try {
+            valueOperations.set(key,userPage,30000, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            log.error("redis set key error",e);
+        }
+        return ResultUtils.success(userPage);
+    }
+
+
+    /**
+     * 匹配最相似的用户
+     * @param num
+     * @param request
+     * @return
+     */
+    @GetMapping("/match")
+    public BaseResponse<List<User>> matchUsers(long num, HttpServletRequest request){
+        if (num <= 0 || num > 20) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+
+        User loginUser = userService.getLoginUser(request);
+        List<User> list = userService.matchUsers(num,loginUser);
+        return ResultUtils.success(list);
+
+    }
 
 }
